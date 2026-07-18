@@ -1,0 +1,56 @@
+name: Expand final project source
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.upload/**'
+      - '.github/workflows/unpack-final-project.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  expand:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reconstruct and validate archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d .upload/tar
+          cat .upload/tar/p* | tr -d '\r\n' | base64 --decode > /tmp/project.tar.xz
+          xz --test /tmp/project.tar.xz
+          mkdir -p /tmp/extracted
+          tar -xJf /tmp/project.tar.xz -C /tmp/extracted
+          package_file="$(find /tmp/extracted -maxdepth 3 -type f -name package.json | head -n 1)"
+          test -n "$package_file"
+          project_root="$(dirname "$package_file")"
+          test -f "$project_root/src/provision/rdp/windowsInstaller.js"
+          test -f "$project_root/src/provision/rdp/linuxInstaller.js"
+          echo "PROJECT_ROOT=$project_root" >> "$GITHUB_ENV"
+
+      - name: Replace repository with expanded source
+        shell: bash
+        run: |
+          set -euo pipefail
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -a "$PROJECT_ROOT"/. .
+          test ! -f .env
+          test -f package.json
+          test -f src/provision/rdp/linuxInstaller.js
+
+      - name: Commit expanded final project
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Deploy final all-OS RDP fix"
+          git push origin HEAD:main
