@@ -6,6 +6,9 @@ on:
     paths:
       - '.upload/**'
       - '.github/workflows/unpack-final-project.yml'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -14,9 +17,10 @@ jobs:
   expand:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout main repository state
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
 
       - name: Reconstruct and validate archive
